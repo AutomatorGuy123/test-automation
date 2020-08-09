@@ -5,7 +5,7 @@ import com.taf.automation.api.ApiUtils;
 import com.taf.automation.api.ParametersType;
 import com.taf.automation.api.ReturnType;
 import com.taf.automation.api.rest.GenericHttpResponse;
-import com.taf.automation.ui.support.Helper;
+import com.taf.automation.ui.support.util.Helper;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
@@ -175,13 +175,11 @@ public class SoapGetHolidayDateDO extends ApiDomainObject {
         String resourcePath = "/HolidayService_v2/HolidayService2.asmx";
         Helper.log(resourcePath);
 
-        getClient().getXstream().autodetectAnnotations(true);
         getClient().getXstream().alias("soap:Envelope", SOAPEnvelopeResponse.class);
-
         getClient().setParametersType(ParametersType.XML);
-        getClient().setReturnType(ReturnType.SOAP);
+        getClient().setReturnType(ReturnType.XML);
         getClient().setCustomContentType("text/xml; charset=utf-8");
-        ApiUtils.updateForSoap(getHeaders(), "http://www.holidaywebservice.com/HolidayService_v2/GetHolidayDate");
+        ApiUtils.updateForSoap(this, "http://www.holidaywebservice.com/HolidayService_v2/GetHolidayDate");
         getResponse().theResponse = getClient().post(resourcePath, getRequest().envelope, SOAPEnvelopeResponse.class, getHeaders());
     }
 

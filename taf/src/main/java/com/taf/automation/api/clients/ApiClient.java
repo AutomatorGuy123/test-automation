@@ -8,8 +8,9 @@ import com.taf.automation.api.ReturnType;
 import com.taf.automation.api.TrustAllStrategy;
 import com.taf.automation.api.rest.GenericHttpInterface;
 import com.taf.automation.api.rest.GenericHttpResponse;
-import com.taf.automation.ui.support.CryptoUtils;
+import com.taf.automation.ui.support.util.CryptoUtils;
 import com.taf.automation.ui.support.TestProperties;
+import com.taf.automation.ui.support.util.URLUtils;
 import com.thoughtworks.xstream.XStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
@@ -31,6 +32,7 @@ import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
@@ -55,6 +57,7 @@ public class ApiClient implements GenericHttpInterface {
     private static final String ACCEPT = "Accept";
     private static final String CONTENT_TYPE = "Content-type";
     private CloseableHttpClient client;
+    private String basePath;
     private HttpHost targetHost;
     private HttpClientContext clientContext;
     private ParametersType parametersType;
@@ -132,7 +135,10 @@ public class ApiClient implements GenericHttpInterface {
             int socketTimeout,
             int connectionTimeout
     ) {
-        targetHost = getTargetHost(url);
+        // The target host does not allow a path value.  So, we will extract the path from the url and store for later.
+        URIBuilder uri = URLUtils.getURI(url);
+        basePath = uri.getPath();
+        targetHost = getTargetHost(StringUtils.removeEnd(url, uri.getPath()));
         client = buildClient(socketTimeout, connectionTimeout);
         clientContext = buildClientContext(targetHost, user, password);
         this.parametersType = parametersType;
@@ -222,12 +228,12 @@ public class ApiClient implements GenericHttpInterface {
         GenericHttpResponse<T> apiResponse;
         try (CloseableHttpResponse response = client.execute(targetHost, request, clientContext)) {
             status = response.getStatusLine();
-            if (returnType == ReturnType.XML) {
-                apiResponse = new XmlResponse<>(response, responseEntity);
+            if (returnType == ReturnType.JAXB) {
+                apiResponse = new JaxbResponse<>(response, responseEntity);
             } else if (returnType == ReturnType.JSON) {
                 apiResponse = new JsonResponse<>(response, responseEntity);
-            } else if (returnType == ReturnType.SOAP) {
-                apiResponse = new SoapResponse<>(response, responseEntity, getXstream());
+            } else if (returnType == ReturnType.XML) {
+                apiResponse = new XmlResponse<>(response, responseEntity, getXstream());
             } else {
                 apiResponse = new GenericResponse<>(response, responseEntity);
             }
@@ -279,9 +285,7 @@ public class ApiClient implements GenericHttpInterface {
         } else {
             switch (parametersType) {
                 case XML:
-                    XStream xstream = new XStream();
-                    xstream.autodetectAnnotations(true);
-                    String xml = ApiUtils.prettifyXML(xstream.toXML(entity));
+                    String xml = ApiUtils.prettifyXML(getXstream().toXML(entity));
                     try {
                         ApiUtils.attachDataXml(xml, "REQUEST ENTITY");
                         httpEntity = new StringEntity(xml);
@@ -363,6 +367,14 @@ public class ApiClient implements GenericHttpInterface {
         }
 
         return xstream;
+    }
+
+    public void setXstream(XStream xstream) {
+        this.xstream = xstream;
+    }
+
+    public String getBasePath() {
+        return basePath;
     }
 
     @Override

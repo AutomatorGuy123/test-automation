@@ -1,7 +1,7 @@
 package com.automation.common.ui.app.components;
 
 import com.taf.automation.ui.support.TestProperties;
-import com.taf.automation.ui.support.Utils;
+import com.taf.automation.ui.support.util.Utils;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
@@ -9,7 +9,6 @@ import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.RemoteWebElement;
 import ui.auto.core.pagecomponent.PageComponentNoDefaultAction;
-import ui.auto.core.utils.WebDriverUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,9 +28,17 @@ public class ImageUpload extends PageComponentNoDefaultAction {
     private RemoteWebDriver driver;
     private List<String> errors;
 
+    public ImageUpload() {
+        super();
+    }
+
+    public ImageUpload(WebElement element) {
+        super(element);
+    }
+
     @Override
     protected void init() {
-        driver = (RemoteWebDriver) WebDriverUtils.getDriverFromElement(getCoreElement());
+        driver = (RemoteWebDriver) Utils.getWebDriver(getCoreElement());
         inputUploadFile = (RemoteWebElement) driver.findElement(By.cssSelector("input[type=file]"));
     }
 
@@ -39,6 +46,7 @@ public class ImageUpload extends PageComponentNoDefaultAction {
         return errors;
     }
 
+    @SuppressWarnings("squid:S2259")
     public void uploadFiles(List<String> imageFiles) {
         errors = new ArrayList<>();
         for (String filePath : imageFiles) {
@@ -50,7 +58,7 @@ public class ImageUpload extends PageComponentNoDefaultAction {
             InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(filePath);
             File file = new File(filePath);
             if (is == null) {
-                throw new RuntimeException("Image file '" + filePath + "' was not found!");
+                assertThat("Image file '" + filePath + "' was not found!", false);
             }
 
             //
@@ -60,7 +68,7 @@ public class ImageUpload extends PageComponentNoDefaultAction {
                 FileUtils.copyInputStreamToFile(is, file);
                 is.close();
             } catch (IOException ignored) {
-
+                //
             }
 
             //

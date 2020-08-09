@@ -1,11 +1,20 @@
 package com.taf.automation.ui.support;
 
-import java.util.Random;
-
+import com.taf.automation.ui.support.util.Utils;
+import net.jodah.failsafe.Failsafe;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
+import java.util.Arrays;
+import java.util.Random;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
+
 public class Rand {
+    private static final Random r = new Random();
+
     /**
      * Default Special characters that cannot be changed
      */
@@ -48,6 +57,19 @@ public class Rand {
      * All the extended numbers that cannot be changed that are used to support additional character sets
      */
     private static final String ALL_NUMBERS = ASCII_NUMBERS + EXTENDED_NUMBERS;
+
+    private Rand() {
+        // Prevent initialization of class as all public methods should be static
+    }
+
+    /**
+     * Get Instance for use with JEXL Expressions
+     *
+     * @return Rand
+     */
+    public static Rand getInstance() {
+        return new Rand();
+    }
 
     /**
      * Gets the default special characters.
@@ -113,7 +135,10 @@ public class Rand {
      * @return int
      */
     private static int randomRange(int nMin, int nMax, boolean inclusive) {
-        int nOffset, nUseRangeMin, nUseRangeMax, nRange;
+        int nOffset;
+        int nUseRangeMin;
+        int nUseRangeMax;
+        int nRange;
 
         // Set the default values for the range
         nUseRangeMin = nMin;
@@ -126,10 +151,10 @@ public class Rand {
             nUseRangeMax = nTemp;
         }
 
-		/*
+        /*
          * Need to shift the range to be 0 to Max for random number generation. The offset will be used after
-		 * to random number in range.
-		 */
+         * to random number in range.
+         */
         nOffset = nUseRangeMin;
 
         // Need to ensure range is positive
@@ -138,7 +163,6 @@ public class Rand {
             nUseRangeMax += -1 * nOffset;
         }
 
-        Random r = new Random();
         if (inclusive)
             nRange = nOffset + r.nextInt(nUseRangeMax - nUseRangeMin + 1);
         else
@@ -180,6 +204,41 @@ public class Rand {
     }
 
     /**
+     * Return integer in specified range excluding specified values
+     *
+     * @param retries  - Number of retries to generate the random value in the range and not any of the excluded values
+     * @param min      - Minimum value (inclusive)
+     * @param max      - Maximum value (inclusive)
+     * @param excludes - Excluded values
+     * @return int
+     */
+    public static int randomRange(int retries, int min, int max, int... excludes) {
+        try {
+            return Failsafe.with(Utils.getRetryPolicy(retries)).get(() -> randomRangeChecked(min, max, excludes));
+        } catch (Exception | AssertionError e) {
+            String reason = "Could NOT find random value in [" + min + "," + max + "] and not in ";
+            reason += Arrays.toString(excludes) + " after " + retries + " retries";
+            assertThat(reason, false);
+            return -1;
+        }
+    }
+
+    /**
+     * Return integer in specified range excluding specified values<BR>
+     * <B>Note: </B> If the random number matches any of the excluded values, then assertion failure occurs
+     *
+     * @param min      - Minimum value (inclusive)
+     * @param max      - Maximum value (inclusive)
+     * @param excludes - Excluded values
+     * @return int
+     */
+    private static int randomRangeChecked(int min, int max, int... excludes) {
+        int random = randomRange(min, max);
+        Arrays.stream(excludes).forEach(item -> assertThat("Excluded Value", random, not(equalTo(item))));
+        return random;
+    }
+
+    /**
      * Gets all enumeration values except excluded values
      *
      * @param e       - Any Enumeration value
@@ -189,7 +248,7 @@ public class Rand {
     private static Enum<?>[] getValues(Enum<?> e, Enum<?>... exclude) {
         Enum<?>[] options = e.getDeclaringClass().getEnumConstants();
         for (Enum<?> item : exclude) {
-            options = (Enum<?>[]) ArrayUtils.removeElement(options, item);
+            options = ArrayUtils.removeElement(options, item);
         }
 
         return options;
@@ -217,10 +276,7 @@ public class Rand {
      * @return true if (rand % 2 == 0) else false
      */
     public static boolean randomBoolean(int nRange) {
-        if (randomRange(0, nRange) % 2 == 0)
-            return true;
-        else
-            return false;
+        return randomRange(0, nRange) % 2 == 0;
     }
 
     /**
@@ -232,6 +288,7 @@ public class Rand {
      * @param e - Any Enumeration value
      * @return enumeration value
      */
+    @SuppressWarnings("squid:S1452")
     public static Enum<?> randomEnum(Enum<?> e) {
         return randomEnum(e, 10000);
     }
@@ -247,6 +304,7 @@ public class Rand {
      *                         number of enumeration values for the enumeration
      * @return enumeration value
      */
+    @SuppressWarnings("squid:S1452")
     public static Enum<?> randomEnum(Enum<?> e, int nRangeMultiplier) {
         Enum<?>[] options = e.getDeclaringClass().getEnumConstants();
         int nSize = options.length;
@@ -270,6 +328,7 @@ public class Rand {
      * @return enumeration value
      * @throws ArithmeticException if all enumeration values are excluded
      */
+    @SuppressWarnings("squid:S1452")
     public static Enum<?> randomEnum(Enum<?> e, Enum<?>... exclude) {
         return randomEnum(e, 10000, exclude);
     }
@@ -291,6 +350,7 @@ public class Rand {
      * @return enumeration value
      * @throws ArithmeticException if all enumeration values are excluded
      */
+    @SuppressWarnings("squid:S1452")
     public static Enum<?> randomEnum(Enum<?> e, int nRangeMultiplier, Enum<?>... exclude) {
         Enum<?>[] options = getValues(e, exclude);
         int nSize = options.length;
@@ -346,7 +406,7 @@ public class Rand {
      * Returns a random string in the specified range size with only alphabetic characters<BR>
      * <BR>
      * <B>Notes:</B><BR>
-     * 1) Minimum & Maximum values need to be greater than zero<BR>
+     * 1) Minimum &amp; Maximum values need to be greater than zero<BR>
      * 2) The range is not affected if Minimum is greater than Maximum<BR>
      * <BR>
      * <B>Examples:</B><BR>
@@ -366,7 +426,7 @@ public class Rand {
      * Returns a random string that only consists of numbers and starts with a non-zero number<BR>
      * <BR>
      * <B>Notes:</B><BR>
-     * 1) Minimum & Maximum values need to be greater than zero<BR>
+     * 1) Minimum &amp; Maximum values need to be greater than zero<BR>
      * 2) The range is not affected if Minimum is greater than Maximum<BR>
      * <BR>
      * <B>Examples:</B><BR>
@@ -388,7 +448,7 @@ public class Rand {
      * Returns an alphanumeric string that starts with a letter in the specified range size<BR>
      * <BR>
      * <B>Notes:</B><BR>
-     * 1) Minimum & Maximum values need to be greater than zero<BR>
+     * 1) Minimum &amp; Maximum values need to be greater than zero<BR>
      * 2) The range is not affected if Minimum is greater than Maximum<BR>
      * <BR>
      * <B>Examples:</B><BR>

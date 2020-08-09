@@ -1,18 +1,19 @@
 package com.taf.automation.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taf.automation.ui.support.testng.Attachment;
 import com.thoughtworks.xstream.XStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
+import org.apache.http.ProtocolVersion;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicStatusLine;
 import org.xml.sax.InputSource;
-import ru.yandex.qatools.allure.Allure;
-import ru.yandex.qatools.allure.events.MakeAttachmentEvent;
 
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Source;
@@ -25,7 +26,9 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -38,6 +41,7 @@ import static org.hamcrest.Matchers.notNullValue;
 public class ApiUtils {
     private static final String HTTPS = "https://";
     private static final String HTTP = "http://";
+    public static final BasicStatusLine OK = new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), HttpStatus.SC_OK, "OK");
 
     private ApiUtils() {
         //
@@ -73,8 +77,7 @@ public class ApiUtils {
      * @param name - Shown in report as name of attachment
      */
     public static void attachDataXml(String xml, String name) {
-        MakeAttachmentEvent ev = new MakeAttachmentEvent(xml.getBytes(), name, "text/xml");
-        Allure.LIFECYCLE.fire(ev);
+        new Attachment().withTitle(name).withType("text/xml").withFile(xml.getBytes()).build();
     }
 
     /**
@@ -84,8 +87,7 @@ public class ApiUtils {
      * @param name - Shown in report as name of attachment
      */
     public static void attachDataJson(String json, String name) {
-        MakeAttachmentEvent ev = new MakeAttachmentEvent(json.getBytes(), name, "application/json");
-        Allure.LIFECYCLE.fire(ev);
+        new Attachment().withTitle(name).withType("application/json").withFile(json.getBytes()).build();
     }
 
     /**
@@ -95,8 +97,7 @@ public class ApiUtils {
      * @param name - Shown in report as name of attachment
      */
     public static void attachDataText(String text, String name) {
-        MakeAttachmentEvent ev = new MakeAttachmentEvent(text.getBytes(), name, "text/plain");
-        Allure.LIFECYCLE.fire(ev);
+        new Attachment().withTitle(name).withType("text/plain").withFile(text.getBytes()).build();
     }
 
     /**
@@ -164,12 +165,12 @@ public class ApiUtils {
     /**
      * Add the headers for a SOAP Request
      *
-     * @param headers    - List of existing headers
-     * @param soapAction - The SOAP action to be added
+     * @param apiDomainObject - API Domain Object to update with the headers for a SOAP Request
+     * @param soapAction      - The SOAP action to be added
      */
-    public static void updateForSoap(List<Header> headers, String soapAction) {
-        headers.add(new BasicHeader("Content-Type", "text/xml; charset=utf-8"));
-        headers.add(new BasicHeader("SOAPAction", soapAction));
+    public static void updateForSoap(ApiDomainObject apiDomainObject, String soapAction) {
+        apiDomainObject.addHeader(new BasicHeader("Content-Type", "text/xml; charset=utf-8"));
+        apiDomainObject.addHeader(new BasicHeader("SOAPAction", soapAction));
     }
 
     /**
@@ -278,6 +279,43 @@ public class ApiUtils {
 
         assertThat("Could not read field (" + field.getName() + ") due to error:  " + error, false);
         return null;
+    }
+
+    /**
+     * Configure xStream with all the fields as aliases prefixed with specified prefix + ":"<BR>
+     * <B>Notes:</B>
+     * <OL>
+     * <LI>This is useful when dealing with SOAP endpoints as normally they are something like <B>abc:field</B>.
+     * This normally requires using XStreamAlias on each of the fields.</LI>
+     * </OL>
+     *
+     * @param xStream       - xStream to configure the aliases
+     * @param definedIn     - the type that declares the field
+     * @param aliasPrefix   - the prefix to append to the fields (a colon will be added)
+     */
+    public static void aliasField(XStream xStream, Class definedIn, String aliasPrefix) {
+        aliasField(xStream, definedIn, aliasPrefix, new HashSet<>());
+    }
+
+    /**
+     * Configure xStream with all the fields as aliases prefixed with specified prefix + ":"<BR>
+     * <B>Notes:</B>
+     * <OL>
+     * <LI>This is useful when dealing with SOAP endpoints as normally they are something like <B>abc:field</B>.
+     * This normally requires using XStreamAlias on each of the fields.</LI>
+     * </OL>
+     *
+     * @param xStream       - xStream to configure the aliases
+     * @param definedIn     - the type that declares the field
+     * @param aliasPrefix   - the prefix to append to the fields (a colon will be added)
+     * @param excludeFields - fields to exclude in the alias configuration
+     */
+    public static void aliasField(XStream xStream, Class definedIn, String aliasPrefix, Set<String> excludeFields) {
+        for (Field item : FieldUtils.getAllFields(definedIn)) {
+            if (!excludeFields.contains(item.getName())) {
+                xStream.aliasField(aliasPrefix + ":" + item.getName(), definedIn, item.getName());
+            }
+        }
     }
 
 }

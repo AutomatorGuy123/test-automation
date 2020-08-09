@@ -1,6 +1,6 @@
 package com.automation.common.ui.app.pageObjects;
 
-import com.taf.automation.ui.support.Helper;
+import com.taf.automation.ui.support.util.Helper;
 import com.taf.automation.ui.support.PageObjectV2;
 import com.taf.automation.ui.support.TestContext;
 import org.openqa.selenium.WebElement;
@@ -30,7 +30,7 @@ public class SearchPage extends PageObjectV2 {
     /**
      * Initialize page for dynamic locators
      *
-     * @param context
+     * @param context - Context
      */
     public void initPage(TestContext context) {
         Helper.log("Dynamic Locator Initialization", true);

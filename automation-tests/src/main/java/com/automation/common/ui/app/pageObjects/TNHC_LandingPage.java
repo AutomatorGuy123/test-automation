@@ -1,14 +1,19 @@
 package com.automation.common.ui.app.pageObjects;
 
 import com.automation.common.ui.app.components.Search;
+import com.automation.common.ui.app.domainObjects.CsvColumnMapping;
 import com.taf.automation.ui.support.AliasedString;
-import com.taf.automation.ui.support.JsUtils;
+import com.taf.automation.ui.support.util.JsUtils;
 import com.taf.automation.ui.support.PageObjectV2;
 import com.taf.automation.ui.support.TestContext;
+import com.taf.automation.ui.support.csv.CsvTestData;
+import com.taf.automation.ui.support.csv.CsvUtils;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
+import org.apache.commons.csv.CSVRecord;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
+import ru.yandex.qatools.allure.annotations.Step;
 import ui.auto.core.components.WebComponent;
 
 import java.util.HashMap;
@@ -18,6 +23,7 @@ import java.util.Map;
  * True North Hockey Canada Landing Page
  */
 public class TNHC_LandingPage extends PageObjectV2 {
+    @XStreamOmitField
     private Map<String, String> substitutions;
 
     @XStreamOmitField
@@ -67,7 +73,7 @@ public class TNHC_LandingPage extends PageObjectV2 {
     /**
      * Initialize page for dynamic locators
      *
-     * @param context
+     * @param context - Context
      */
     public void initPage(TestContext context) {
         initPage(context, getSubstitutions());
@@ -98,9 +104,9 @@ public class TNHC_LandingPage extends PageObjectV2 {
         return player;
     }
 
+    @Step("Set Player")
     public void setPlayer() {
-        player.setValue();
-        player.validateData();
+        setElementValueV2(player);
     }
 
     public void setPlayerJS() {
@@ -114,13 +120,15 @@ public class TNHC_LandingPage extends PageObjectV2 {
         team.validateData();
     }
 
+    @Step("Set Division")
     public void setDivision() {
         division.setValue();
-        division.validateData();
+        validateData(division);
     }
 
+    @Step("Perform Search")
     public void performSearch() {
-        searchFields.setValue();
+        setElementValueV2(searchFields);
         searchFields.clickSearch();
     }
 
@@ -133,12 +141,22 @@ public class TNHC_LandingPage extends PageObjectV2 {
     }
 
     public void setAlternate() {
-        alternate.setValue();
-        alternate.validateData();
+        setElementValueV2(alternate);
     }
 
     public void performAccessibilityTest() {
         performAccessibilityTest("True North Hockey Page");
+    }
+
+    /**
+     * Use the CSV data to set the variables in the domain object
+     *
+     * @param csvTestData - CSV test data
+     */
+    public void setData(CsvTestData csvTestData) {
+        CSVRecord csv = csvTestData.getRecord();
+        CsvUtils.setData(csv, CsvColumnMapping.PLAYER, player);
+        CsvUtils.setData(csv, CsvColumnMapping.TEAM, team);
     }
 
 }

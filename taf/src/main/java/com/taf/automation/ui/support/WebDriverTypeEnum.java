@@ -1,5 +1,10 @@
 package com.taf.automation.ui.support;
 
+import com.taf.automation.ui.support.util.Utils;
+import io.appium.java_client.AppiumDriver;
+import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.ios.IOSDriver;
+import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.Platform;
 import org.openqa.selenium.Proxy;
@@ -15,6 +20,7 @@ import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
 import org.openqa.selenium.ie.InternetExplorerDriver;
 import org.openqa.selenium.opera.OperaDriver;
+import org.openqa.selenium.remote.BrowserType;
 import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -26,12 +32,16 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 public enum WebDriverTypeEnum {
-    CHROME("chrome", ChromeDriver.class),
-    EDGE("MicrosoftEdge", EdgeDriver.class),
-    FIREFOX("firefox", FirefoxDriver.class),
-    IE("internet explorer", InternetExplorerDriver.class),
-    OPERA_BLINK("operablink", OperaDriver.class),
-    SAFARI("safari", SafariDriver.class);
+    CHROME(BrowserType.CHROME, ChromeDriver.class),
+    EDGE(BrowserType.EDGE, EdgeDriver.class),
+    FIREFOX(BrowserType.FIREFOX, FirefoxDriver.class),
+    IE(BrowserType.IE, InternetExplorerDriver.class),
+    OPERA_BLINK(BrowserType.OPERA_BLINK, OperaDriver.class),
+    SAFARI(BrowserType.SAFARI, SafariDriver.class),
+    ANDROID(BrowserType.ANDROID, AndroidDriver.class),
+    IPHONE(BrowserType.IPHONE, IOSDriver.class),
+    IPAD(BrowserType.IPAD, IOSDriver.class),
+    ;
 
     String driverName;
     Class<? extends WebDriver> driverClass;
@@ -46,11 +56,34 @@ public enum WebDriverTypeEnum {
     }
 
     public WebDriver getNewWebDriver() {
-        return getNewWebDriver(TestProperties.getInstance());
+        TestProperties prop = Utils.deepCopy(TestProperties.getInstance());
+        Utils.writeField(prop, "browserType", this);
+        return getNewWebDriver(prop);
     }
 
-    @SuppressWarnings("squid:S00112")
+    /**
+     * Get a New Web Driver based on the passed Test Properties
+     *
+     * @param prop - Test Properties to be used to get the new WebDriver
+     * @return WebDriver
+     */
     public WebDriver getNewWebDriver(TestProperties prop) {
+        return getNewWebDriver(prop, null);
+    }
+
+    /**
+     * Get a New Web Driver based on the passed Test Properties &amp; Desired Capabilities<BR>
+     * <B>Notes: </B>
+     * <OL>
+     * <LI>The extra Desired Capabilities is applied first.  The Test Properties Extra Capabilities is applied after</LI>
+     * </OL>
+     *
+     * @param prop  - Test Properties to be used to get the new WebDriver
+     * @param extra - The extra Desired Capabilities (not applied to remote execution)
+     * @return WebDriver
+     */
+    @SuppressWarnings("squid:S00112")
+    public WebDriver getNewWebDriver(TestProperties prop, DesiredCapabilities extra) {
         DesiredCapabilities capabilities = new DesiredCapabilities();
         Proxy proxy = null;
         if (prop.getHttpProxy() != null) {
@@ -76,7 +109,7 @@ public enum WebDriverTypeEnum {
 
         capabilities.setCapability(CapabilityType.ACCEPT_SSL_CERTS, true);
 
-        if (prop.getRemoteURL() != null) {
+        if (prop.getRemoteURL() != null && !prop.getBrowserType().isAppiumDriver()) {
             try {
                 return new RemoteWebDriver(new URL(prop.getRemoteURL()), getRemoteCapabilities(prop, capabilities));
             } catch (MalformedURLException e) {
@@ -84,7 +117,10 @@ public enum WebDriverTypeEnum {
             }
         }
 
-        switch (this) {
+        // Note:  Null desired capabilities will just skip
+        capabilities.merge(extra);
+
+        switch (prop.getBrowserType()) {
             case FIREFOX:
                 return getFirefoxDriver(prop, capabilities);
             case CHROME:
@@ -93,6 +129,11 @@ public enum WebDriverTypeEnum {
                 return getSafariDriver(prop, capabilities);
             case EDGE:
                 return getEdgeDriver(prop, capabilities);
+            case ANDROID:
+                return getAndroidDriver(prop, capabilities);
+            case IPAD:
+            case IPHONE:
+                return getIOSDriver(prop, capabilities);
             default:
                 try {
                     Constructor<? extends WebDriver> constructor = driverClass.getConstructor(Capabilities.class);
@@ -111,16 +152,16 @@ public enum WebDriverTypeEnum {
         }
 
         DesiredCapabilities capabilities = new DesiredCapabilities();
-        capabilities.setBrowserName(getDriverName());
+        capabilities.setBrowserName(prop.getBrowserType().getDriverName());
         capabilities.setVersion(prop.getBrowserVersion());
         capabilities.setPlatform(platform);
         capabilities.merge(prop.getExtraCapabilities());
 
-        if (this == FIREFOX) {
+        if (prop.getBrowserType() == FIREFOX) {
             capabilities.setCapability(FirefoxOptions.FIREFOX_OPTIONS, getFirefoxOptions(prop, mergeCapabilities, false));
-        } else if (this == CHROME) {
+        } else if (prop.getBrowserType() == CHROME) {
             capabilities.setCapability(ChromeOptions.CAPABILITY, getChromeOptions(prop, mergeCapabilities));
-        } else if (this == SAFARI) {
+        } else if (prop.getBrowserType() == SAFARI) {
             capabilities.setCapability(SafariOptions.CAPABILITY, getSafariOptions(prop, mergeCapabilities));
         } else {
             capabilities.merge(mergeCapabilities);
@@ -139,6 +180,13 @@ public enum WebDriverTypeEnum {
         profile.setPreference("focusmanager.testmode", true);
         profile.setPreference("dom.max_chrome_script_run_time", 0);
         profile.setPreference("dom.max_script_run_time", 0);
+
+        // Handle SSO on specified sites
+        String uris = prop.getFirefoxNTLM_URIS();
+        if (StringUtils.isNotBlank(uris)) {
+            profile.setPreference("network.automatic-ntlm-auth.trusted-uris", uris);
+        }
+
         profile.setAcceptUntrustedCertificates(true);
         profile.setAssumeUntrustedCertificateIssuer(false);
         if (prop.getUserAgent() != null) {
@@ -152,7 +200,7 @@ public enum WebDriverTypeEnum {
         FirefoxOptions firefoxOptions = new FirefoxOptions();
         firefoxOptions.merge(mergeCapabilities);
         firefoxOptions.setProfile(profile);
-        firefoxOptions.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
+        firefoxOptions.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.IGNORE);
         firefoxOptions.setAcceptInsecureCerts(true);
         firefoxOptions.setLogLevel(FirefoxDriverLogLevel.WARN);
         firefoxOptions.addArguments("--log fatal");
@@ -187,7 +235,7 @@ public enum WebDriverTypeEnum {
         }
 
         chromeOptions.merge(mergeCapabilities);
-        chromeOptions.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.DISMISS);
+        chromeOptions.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.IGNORE);
         return chromeOptions;
     }
 
@@ -213,6 +261,36 @@ public enum WebDriverTypeEnum {
         EdgeOptions options = new EdgeOptions();
         options.merge(mergeCapabilities);
         return options;
+    }
+
+    private AndroidDriver getAndroidDriver(TestProperties prop, DesiredCapabilities capabilities) {
+        capabilities.setBrowserName(null);
+        capabilities.setPlatform(null);
+        capabilities.setCapability(CapabilityType.PLATFORM_NAME, Platform.ANDROID);
+        capabilities.merge(prop.getExtraCapabilities());
+        return new AndroidDriver(getRemoteURL(prop), capabilities);
+    }
+
+    private IOSDriver getIOSDriver(TestProperties prop, DesiredCapabilities capabilities) {
+        capabilities.setBrowserName(null);
+        capabilities.setPlatform(null);
+        capabilities.setCapability(CapabilityType.PLATFORM_NAME, Platform.IOS);
+        capabilities.merge(prop.getExtraCapabilities());
+        return new IOSDriver(getRemoteURL(prop), capabilities);
+    }
+
+    @SuppressWarnings("squid:S00112")
+    private URL getRemoteURL(TestProperties prop) {
+        try {
+            return new URL(prop.getRemoteURL());
+        } catch (Exception ex) {
+            String message = "webdriver.remote.url property had invalid URL:  " + prop.getRemoteURL();
+            throw new RuntimeException(message, ex);
+        }
+    }
+
+    public boolean isAppiumDriver() {
+        return AppiumDriver.class.isAssignableFrom(driverClass);
     }
 
 }

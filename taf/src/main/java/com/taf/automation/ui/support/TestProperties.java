@@ -1,11 +1,25 @@
 package com.taf.automation.ui.support;
 
+import com.taf.automation.ui.support.converters.Credentials;
+import com.taf.automation.ui.support.converters.CredentialsObjectPropertyConverter;
+import com.taf.automation.ui.support.converters.CredentialsPropertyConverter;
+import com.taf.automation.ui.support.converters.CreditCard;
+import com.taf.automation.ui.support.converters.CreditCardPropertyConverter;
+import com.taf.automation.ui.support.converters.DynamicCredentials;
+import com.taf.automation.ui.support.converters.DynamicCredentialsPropertyConverter;
+import com.taf.automation.ui.support.converters.EnumPropertyConverter;
+import com.taf.automation.ui.support.converters.EnvironmentPropertyConverter;
+import com.taf.automation.ui.support.util.CryptoUtils;
+import com.taf.automation.ui.support.util.URLUtils;
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
 import net.lightbody.bmp.client.ClientUtil;
 import net.lightbody.bmp.core.har.Har;
 import net.lightbody.bmp.proxy.CaptureType;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.Platform;
 import org.openqa.selenium.Proxy;
@@ -15,20 +29,34 @@ import ru.yandex.qatools.properties.PropertyLoader;
 import ru.yandex.qatools.properties.annotations.Property;
 import ru.yandex.qatools.properties.annotations.Resource;
 import ru.yandex.qatools.properties.annotations.Use;
+import ui.auto.core.support.EnvironmentsSetup;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The class holds all the test properties
  */
 @Resource.Classpath("test.properties")
 public class TestProperties {
+    @Use(EnvironmentPropertyConverter.class)
+    @Property("test.env")
+    @HideInReport
+    private EnvironmentsSetup.Environment testEnvironment;
+
+    @Property("always.install.drivers")
+    private boolean alwaysInstallDrivers = false;
+
+    @Property("global.encryption")
+    private boolean globalEncryption = false;
+
     @Property("mail.proxy")
     private String mailProxy;
 
@@ -71,6 +99,9 @@ public class TestProperties {
     @Property("app.environment")
     private Environment environment;
 
+    @Property("app.environment.target")
+    private String environmentTarget;
+
     @Use(CredentialsObjectPropertyConverter.class)
     @Property("app.credentials.api")
     @HideInReport
@@ -92,6 +123,11 @@ public class TestProperties {
     @HideInReport
     private CreditCard[] appCreditCards;
 
+    @Use(DynamicCredentialsPropertyConverter.class)
+    @Property("dynamic.credentials")
+    @HideInReport
+    private DynamicCredentials[] dynamicCredentials;
+
     @Use(CredentialsPropertyConverter.class)
     @Property("app.credentials")
     @HideInReport
@@ -105,11 +141,16 @@ public class TestProperties {
     @Property("timeout.page.load")
     private int pageLoadTimeout = 5; // In minutes
 
+    @SuppressWarnings("squid:S00116")
     @Property("timeout.page")
     private int page_timeout; // In seconds
 
     @Property("timeout.element")
     private int element_timeout; // In seconds
+
+    @SuppressWarnings("squid:S00116")
+    @Property("timeout.negative")
+    private int negative_timeout; // In seconds
 
     @Property("test.suites")
     private String suites;
@@ -122,6 +163,9 @@ public class TestProperties {
 
     @Property("report.its.pattern")
     private String issueTrackingSystemPattern;
+
+    @Property("allure.tests.management.pattern")
+    private String testsManagementPattern;
 
     @Property("report.port")
     private int reportPort = 8090;
@@ -144,6 +188,10 @@ public class TestProperties {
     @Property("db.password")
     @HideInReport
     private String dbPassword;
+
+    @Property("db.integrated.security")
+    @HideInReport
+    private boolean dbIntegratedSecurity = false;
 
     @Property("db.name")
     private String dbName; // Database (name) to use
@@ -196,6 +244,14 @@ public class TestProperties {
     @Property("firefox.no.marionette")
     private boolean useNoMarionette;
 
+    @SuppressWarnings("squid:S00116")
+    @Property("firefox.ntlm.auto")
+    private boolean firefox_NTLM_Auto;
+
+    @SuppressWarnings("squid:S00116")
+    @Property("firefox.ntlm.uris")
+    private String firefox_NTLM_URIS;
+
     @Property("webdriver.screenshot.view.port.only")
     private boolean viewPortOnly = true;
 
@@ -210,8 +266,11 @@ public class TestProperties {
     @Property("documentation.mode")
     private boolean documentationMode = false;
 
-    @Property("mail.pop3.server")
+    @Property("mail.server")
     private String mailServer;
+
+    @Property("mail.server.port")
+    private int mailServerPort;
 
     @Property("mail.password")
     @HideInReport
@@ -250,7 +309,18 @@ public class TestProperties {
     /**
      * Stores the Browser Mob Proxy for each thread
      */
+    @SuppressWarnings("squid:S1149")
     private Map<Long, BrowserMobProxy> browserMobProxies = new Hashtable<>();
+
+    /**
+     * For better performance, cache the users.  Only use the getter to access
+     */
+    private Map<String, EnvironmentsSetup.User> cachedUsers;
+
+    /**
+     * For better performance, cache the custom properties.  Only use the getter to access
+     */
+    private Map<String, EnvironmentsSetup.Property> cachedCustomProps;
 
     /**
      * Constructor
@@ -260,6 +330,10 @@ public class TestProperties {
         PropertyLoader.populate(this);
         if (issueTrackingSystemPattern != null) {
             System.setProperty("allure.issues.tracker.pattern", issueTrackingSystemPattern);
+        }
+
+        if (testsManagementPattern != null) {
+            System.setProperty("allure.tests.management.pattern", testsManagementPattern);
         }
     }
 
@@ -300,6 +374,124 @@ public class TestProperties {
         }
 
         return null;
+    }
+
+    public EnvironmentsSetup.Environment getTestEnvironment() {
+        return testEnvironment;
+    }
+
+    /**
+     * Get the field with fallback to environment property
+     *
+     * @param field            - Field from this class
+     * @param replaceTargetENV - true to replace the target environment in the field
+     * @param key              - the environment custom key to lookup value if necessary
+     * @param decode           - true to decode the environment value if necessary
+     * @return String
+     */
+    private String getFieldWithFallBack(String field, boolean replaceTargetENV, String key, boolean decode) {
+        String value = (replaceTargetENV) ? replaceWithTargetEnv(field) : field;
+        if (value == null && key != null) {
+            value = getEnvironmentCustom(key, decode);
+        }
+
+        return value;
+    }
+
+    /**
+     * Get the field with fallback to environment property
+     *
+     * @param field             - Field from this class
+     * @param fallbackAttemptOn - if the field equals this value, then use environment to lookup value
+     * @param key               - the environment custom key to lookup value if necessary
+     * @param decode            - true to decode the environment value if necessary
+     * @return int
+     */
+    private int getFieldWithFallBack(int field, int fallbackAttemptOn, String key, boolean decode) {
+        if (field == fallbackAttemptOn) {
+            String value = getEnvironmentCustom(key, decode);
+            return NumberUtils.toInt(value, field);
+        } else {
+            return field;
+        }
+    }
+
+    public boolean isCustom(String key) {
+        return BooleanUtils.toBoolean(getEnvironmentCustom(key, false));
+    }
+
+    public String getCustom(String key, String defaultValue) {
+        return getCustom(key, defaultValue, false);
+    }
+
+    public String getCustom(String key, String defaultValue, boolean decode) {
+        String value = getEnvironmentCustom(key, decode);
+        return (value == null) ? defaultValue : value;
+    }
+
+    private String getEnvironmentCustom(String key, boolean decode) {
+        if (getTestEnvironment() != null) {
+            try {
+                String value = getCachedCustomProps().get(key).getValue();
+                return (decode) ? new CryptoUtils().decrypt(value) : value;
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    @SuppressWarnings("java:S2168")
+    private Map<String, EnvironmentsSetup.Property> getCachedCustomProps() {
+        if (cachedCustomProps == null) {
+            synchronized (this) {
+                if (cachedCustomProps == null) {
+                    try {
+                        Field fieldCustom = FieldUtils.getField(EnvironmentsSetup.Environment.class, "custom", true);
+                        cachedCustomProps = ((List<EnvironmentsSetup.Property>) FieldUtils.readField(fieldCustom, getTestEnvironment(), true))
+                                .stream()
+                                .collect(Collectors.toMap(EnvironmentsSetup.Property::getName, item -> item, (lhs, rhs) -> lhs));
+                    } catch (Exception ex) {
+                        cachedCustomProps = new HashMap<>();
+                    }
+                }
+            }
+        }
+
+        return cachedCustomProps;
+    }
+
+    public EnvironmentsSetup.User getUser(String role) {
+        return getCachedUsers().get(role.toLowerCase());
+    }
+
+    @SuppressWarnings("java:S2168")
+    private Map<String, EnvironmentsSetup.User> getCachedUsers() {
+        if (cachedUsers == null) {
+            synchronized (this) {
+                if (cachedUsers == null) {
+                    try {
+                        cachedUsers = getTestEnvironment()
+                                .getUsers()
+                                .stream()
+                                .collect(Collectors.toMap(EnvironmentsSetup.User::getRole, item -> item, (lhs, rhs) -> lhs));
+                    } catch (Exception ex) {
+                        cachedUsers = new HashMap<>();
+                    }
+                }
+            }
+        }
+
+        return cachedUsers;
+    }
+
+    public boolean isAlwaysInstallDrivers() {
+        return alwaysInstallDrivers;
+    }
+
+    public boolean isGlobalEncryption() {
+        return globalEncryption;
     }
 
     public String getMailProxy() {
@@ -345,9 +537,9 @@ public class TestProperties {
     public Capabilities getExtraCapabilities() {
         DesiredCapabilities capabilities = new DesiredCapabilities();
         if (extraCapabilities != null) {
-            String params[] = extraCapabilities.split(",");
+            String[] params = extraCapabilities.split(",");
             for (String param : params) {
-                String values[] = param.split("=", 2);
+                String[] values = param.split("=", 2);
                 capabilities.setCapability(values[0].trim(), values[1].trim());
             }
         }
@@ -363,12 +555,25 @@ public class TestProperties {
         return environment.isProdEnv();
     }
 
-    public String getApiUrl() {
-        if (isProdEnv()) {
-            return apiUrlProd;
-        } else {
-            return apiUrl;
+    public String getEnvironmentTarget() {
+        return environmentTarget;
+    }
+
+    private String replaceWithTargetEnv(String url) {
+        if (url == null || environmentTarget == null) {
+            return url;
         }
+
+        return url.replaceAll("(?i)\\$\\{env}", environmentTarget);
+    }
+
+    public String getApiUrl() {
+        String value = (isProdEnv()) ? apiUrlProd : replaceWithTargetEnv(apiUrl);
+        if (value == null) {
+            value = getEnvironmentCustom("apiUrl", false);
+        }
+
+        return value;
     }
 
     public Credentials getApiCredentials() {
@@ -391,6 +596,10 @@ public class TestProperties {
         return appCreditCards;
     }
 
+    public DynamicCredentials[] getDynamicCredentials() {
+        return dynamicCredentials;
+    }
+
     public Credentials[] getAppCredentials() {
         Credentials[] credentials;
         if (isProdEnv()) {
@@ -403,12 +612,13 @@ public class TestProperties {
     }
 
     private String fromArray(Object array) {
-        String value = "";
-        for (Object string : (Object[]) array) {
-            value += string.toString() + ", ";
+        StringBuilder sb = new StringBuilder();
+        for (Object value : (Object[]) array) {
+            sb.append(value.toString());
+            sb.append(", ");
         }
 
-        return value;
+        return StringUtils.removeEnd(sb.toString(), ", ");
     }
 
     public List<Parameter> getAsParameters() {
@@ -427,7 +637,7 @@ public class TestProperties {
                     value = "";
                 }
 
-                if (value != null && !value.trim().isEmpty()) {
+                if (StringUtils.isNotBlank(value)) {
                     params.add(new Parameter().withKey(property).withName(property).withValue(value));
                 }
             }
@@ -472,15 +682,19 @@ public class TestProperties {
         return element_timeout;
     }
 
+    public int getNegativeTimeout() {
+        return negative_timeout;
+    }
+
+    @SuppressWarnings("squid:S00112")
     public List<String> getSuites() {
         List<String> suitesList = new ArrayList<>();
         if (this.suites != null) {
-            String[] suites = this.suites.split(",");
-            for (String s : suites) {
+            String[] theSuites = this.suites.split(",");
+            for (String s : theSuites) {
                 suitesList.add(s.trim().replace("\"", "").replace("\'", ""));
                 if (isProdEnv() && !s.toLowerCase().contains("prod.xml")) {
-                    throw new RuntimeException(
-                            "The suite file name should end with 'PROD' to be able to run on PRODUCTION ENVIRONMENT!");
+                    throw new RuntimeException("The suite file name should end with 'PROD' to be able to run on PRODUCTION ENVIRONMENT!");
                 }
             }
         }
@@ -505,7 +719,12 @@ public class TestProperties {
     }
 
     public String getDbPassword() {
-        return dbPassword;
+        // Field is encrypted and classes that use decrypt as such leaving encrypted
+        return getFieldWithFallBack(dbPassword, false, "dbPassword", false);
+    }
+
+    public boolean isDbIntegratedSecurity() {
+        return dbIntegratedSecurity;
     }
 
     public String getDbName() {
@@ -549,11 +768,12 @@ public class TestProperties {
     }
 
     public String getURL() {
-        if (isProdEnv()) {
-            return urlProd;
-        } else {
-            return url;
+        String value = (isProdEnv()) ? urlProd : replaceWithTargetEnv(url);
+        if (value == null && getTestEnvironment() != null) {
+            value = getTestEnvironment().getUrl();
         }
+
+        return value;
     }
 
     public Integer getThreadCount() {
@@ -566,6 +786,27 @@ public class TestProperties {
 
     public boolean noMarionette() {
         return useNoMarionette;
+    }
+
+    @SuppressWarnings("squid:S00100")
+    public String getFirefoxNTLM_URIS() {
+        if (firefox_NTLM_Auto) {
+            List<String> uris = new ArrayList<>();
+
+            if (StringUtils.isNotBlank(getURL())) {
+                uris.add(getURL());
+            }
+
+            StringBuilder sb = new StringBuilder();
+            for (String uri : uris) {
+                sb.append(URLUtils.getURI(StringUtils.trim(uri)).getHost());
+                sb.append(",");
+            }
+
+            return StringUtils.removeEnd(sb.toString(), ",");
+        }
+
+        return firefox_NTLM_URIS;
     }
 
     public boolean isViewPortOnly() {
@@ -595,11 +836,16 @@ public class TestProperties {
     }
 
     public String getMailServer() {
-        return mailServer;
+        return getFieldWithFallBack(mailServer, true, "mailServer", false);
+    }
+
+    public int getMailServerPort() {
+        return getFieldWithFallBack(mailServerPort, 0, "mailServerPort", false);
     }
 
     public String getMailPassword() {
-        return mailPassword;
+        // Field is encrypted and classes that use decrypt as such leaving encrypted
+        return getFieldWithFallBack(mailPassword, false, "mailPassword", false);
     }
 
     public int getMailTimeout() {
@@ -636,13 +882,7 @@ public class TestProperties {
 
     private BrowserMobProxy getBrowserMobProxyForThread() {
         Long threadId = Thread.currentThread().getId();
-        BrowserMobProxy storedProxy = browserMobProxies.get(threadId);
-        if (storedProxy == null) {
-            storedProxy = new BrowserMobProxyServer();
-            browserMobProxies.put(threadId, storedProxy);
-        }
-
-        return storedProxy;
+        return browserMobProxies.computeIfAbsent(threadId, k -> new BrowserMobProxyServer());
     }
 
     private void removeBrowserMobProxyForThread() {
@@ -687,6 +927,7 @@ public class TestProperties {
      *
      * @param filename - File to write to
      */
+    @SuppressWarnings("squid:S00112")
     public void performWriteBrowserMobProxyLogToFile(String filename) {
         if (isBrowserMobProxy() && writeBrowserMobProxyLogToFile) {
             try {

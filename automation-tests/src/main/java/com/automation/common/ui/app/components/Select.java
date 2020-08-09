@@ -1,12 +1,12 @@
 package com.automation.common.ui.app.components;
 
-import com.taf.automation.ui.support.Utils;
+import com.taf.automation.ui.support.util.Utils;
 import org.openqa.selenium.WebElement;
 import ui.auto.core.components.SelectComponent;
 
 public class Select extends SelectComponent {
     public Select() {
-
+        super();
     }
 
     public Select(WebElement element) {
@@ -26,4 +26,5 @@ public class Select extends SelectComponent {
         Utils.waitForSelectOption(this);
         super.setValue();
     }
+
 }

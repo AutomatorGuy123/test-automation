@@ -1,13 +1,12 @@
 package com.taf.automation.ui.support;
 
 import com.google.common.collect.Lists;
+import com.taf.automation.ui.support.util.Utils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.pagefactory.ElementLocator;
-import org.openqa.selenium.support.ui.Clock;
-import org.openqa.selenium.support.ui.SystemClock;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -22,7 +21,7 @@ public class DynamicElementLocator implements ElementLocator {
     private final int timeOutInSeconds;
     private final boolean shouldCache;
     private final By by;
-    private final Clock clock;
+    private final BasicClock clock;
     private WebElement cachedElement;
     private List<WebElement> cachedElementList;
 
@@ -32,7 +31,7 @@ public class DynamicElementLocator implements ElementLocator {
         DynamicAnnotations annotations = new DynamicAnnotations(field, substitutions);
         shouldCache = annotations.isLookupCached();
         by = annotations.buildBy();
-        clock = new SystemClock();
+        clock = new BasicClock();
     }
 
     public WebElement findElement() {

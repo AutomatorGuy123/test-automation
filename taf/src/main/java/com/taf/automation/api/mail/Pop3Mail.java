@@ -2,10 +2,10 @@ package com.taf.automation.api.mail;
 
 import com.sun.mail.pop3.POP3Store;
 import com.taf.automation.api.network.SSHSession;
-import com.taf.automation.ui.support.CryptoUtils;
+import com.taf.automation.ui.support.util.CryptoUtils;
 import com.taf.automation.ui.support.Environment;
 import com.taf.automation.ui.support.TestProperties;
-import com.taf.automation.ui.support.Utils;
+import com.taf.automation.ui.support.util.Utils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +27,29 @@ public class Pop3Mail {
     private static final Logger LOG = LoggerFactory.getLogger(Pop3Mail.class);
     private SSHSession sshSession;
     private POP3Store store;
-    private long mailTimeOut = TestProperties.getInstance().getMailTimeout();
+    private final long mailTimeOut = TestProperties.getInstance().getMailTimeout();
+
+    public Pop3Mail() {
+        TestProperties tProps = TestProperties.getInstance();
+        Properties props = System.getProperties();
+        String mailServer = tProps.getMailServer();
+        int port = (tProps.getMailServerPort() > 0) ? tProps.getMailServerPort() : 110;
+
+        if (tProps.getSshHost() != null) {
+            sshSession = new SSHSession(mailServer, port);
+            port = sshSession.getPort();
+            mailServer = "localhost";
+        }
+
+        props.setProperty("mail.pop3.host", mailServer);
+        props.setProperty("mail.pop3.port", "" + port);
+        Session session = Session.getDefaultInstance(props);
+        try {
+            store = (POP3Store) session.getStore("pop3");
+        } catch (NoSuchProviderException e) {
+            LOG.error("Exception occurred in Pop3Mail()", e);
+        }
+    }
 
     private Folder getFolder(String user) {
         Folder folder = null;
@@ -35,6 +57,7 @@ public class Pop3Mail {
             if (store.isConnected()) {
                 store.close();
             }
+
             store.connect(user, new CryptoUtils().decrypt(TestProperties.getInstance().getMailPassword()));
             folder = store.getFolder("INBOX");
             folder.open(Folder.READ_WRITE);
@@ -45,6 +68,7 @@ public class Pop3Mail {
         return folder;
     }
 
+    @SuppressWarnings("java:S112")
     private Folder getFolderForUser(String user) {
         Folder folder;
         long time_out = System.currentTimeMillis() + mailTimeOut;
@@ -100,6 +124,7 @@ public class Pop3Mail {
         };
     }
 
+    @SuppressWarnings("java:S112")
     public List<MailMessage> searchForEmail(
             String recipient,
             String subject,
@@ -168,28 +193,6 @@ public class Pop3Mail {
         if (getFolder(recipient) != null) {
             List<MailMessage> msgs = searchForEmail(recipient, false, true);
             LOG.info("Deleted {} mail messages", msgs.size());
-        }
-    }
-
-    public Pop3Mail() {
-        TestProperties tProps = TestProperties.getInstance();
-        Properties props = System.getProperties();
-        String mailServer = tProps.getMailServer();
-        int port = 110;
-
-        if (tProps.getSshHost() != null) {
-            sshSession = new SSHSession(mailServer, port);
-            port = sshSession.getPort();
-            mailServer = "localhost";
-        }
-
-        props.setProperty("mail.pop3.host", mailServer);
-        props.setProperty("mail.pop3.port", "" + port);
-        Session session = Session.getDefaultInstance(props);
-        try {
-            store = (POP3Store) session.getStore("pop3");
-        } catch (NoSuchProviderException e) {
-            LOG.error("Exception occurred in Pop3Mail()", e);
         }
     }
 

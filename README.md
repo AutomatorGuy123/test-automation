@@ -1,7 +1,13 @@
 # TAF (Test Automation Framework)
 
-Note:  It is necessary to replace the drivers in the folders webdrivers based on which operating system(s)
+**Notes:**
+
+1)  It is necessary to replace the drivers in the folders webdrivers based on which operating system(s)
 you want to run against as they are just placeholders (text files)
+
+2)  It is necessary to manually install the Oracle (and/or SQL Server) driver.  Also, modification of the OracleInstance (and/or SqlServerInstance) class will be required.
+
+3)  It is necessary to replace the DLL files if using SQL Server with integrated security as they are just placeholders (text files)
 
 ## Basic overview of the core classes that are mainly used
 

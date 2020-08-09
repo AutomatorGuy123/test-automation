@@ -1,7 +1,7 @@
 package com.automation.common.ui.app.components;
 
 import com.taf.automation.ui.support.Rand;
-import com.taf.automation.ui.support.Utils;
+import com.taf.automation.ui.support.util.Utils;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
 import net.jodah.failsafe.Failsafe;
 import org.apache.commons.lang3.StringUtils;
@@ -15,8 +15,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static com.taf.automation.ui.support.AssertsUtil.matchesRegex;
-import static com.taf.automation.ui.support.AssertsUtil.range;
+import static com.taf.automation.ui.support.util.AssertsUtil.matchesRegex;
+import static com.taf.automation.ui.support.util.AssertsUtil.range;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
@@ -27,23 +27,23 @@ import static org.hamcrest.Matchers.notNullValue;
  * Enhanced version of SelectComponent for more flexibility with drop downs<BR>
  * <B>Data Formats:</B><BR>
  * <OL>
- * <LI>For non-random options:  {Selection} >>> {Value}</LI>
- * <LI>For random option starting from min value:  RANDOM_INDEX >>> {Minimum Index}</LI>
- * <LI>For random option from specified list:  RANDOM_INDEX_VALUES >>> {Index 1},{Index 2}, ..., {Index N}</LI>
- * <LI>For random option in range:  RANDOM_INDEX_RANGE >>> {Minimum Index Inclusive}:{Maximum Index Exclusive}</LI>
+ * <LI>For non-random options:  {Selection} &gt;&gt;&gt; {Value}</LI>
+ * <LI>For random option starting from min value:  RANDOM_INDEX &gt;&gt;&gt; {Minimum Index}</LI>
+ * <LI>For random option from specified list:  RANDOM_INDEX_VALUES &gt;&gt;&gt; {Index 1},{Index 2}, ..., {Index N}</LI>
+ * <LI>For random option in range:  RANDOM_INDEX_RANGE &gt;&gt;&gt; {Minimum Index Inclusive}:{Maximum Index Exclusive}</LI>
  * </OL>
  * <B>Examples:</B><BR>
  * <OL>
  * <LI>Select drop down option using visible text of "option 1":  <B>option 1</B></LI>
- * <LI>Select drop down option using visible text of "option 2":  <B>VISIBLE_TEXT >>> option 2</B></LI>
- * <LI>Select drop down option using the HTML attribute value of "option 3":  <B>VALUE_HTML >>> option 3</B></LI>
- * <LI>Select drop down option at index 4 (provided there are at least 5 drop down options):  <B>INDEX >>> 4</B></LI>
- * <LI>Select drop down option using regular expression to match visible text of "option 5":   <B>VISIBLE_TEXT_REGEX >>> .*5.*</B></LI>
- * <LI>Select drop down option using regular expression to match the HTML attribute value of "option 6":  <B>VALUE_HTML_REGEX >>> .*6.*</B></LI>
- * <LI>Select a random option:  <B>RANDOM_INDEX >>> 0</B></LI>
- * <LI>Select a random option from index 1:  <B>RANDOM_INDEX >>> 1</B></LI>
- * <LI>Select a random option from the list of indexes {1, 3, 5}:  <B>RANDOM_INDEX_VALUES >>> 1,3,5</B></LI>
- * <LI>Select a random option from the list of consecutive indexes {1,2,3}:  <B>RANDOM_INDEX_RANGE >>> 1:4</B></LI>
+ * <LI>Select drop down option using visible text of "option 2":  <B>VISIBLE_TEXT &gt;&gt;&gt; option 2</B></LI>
+ * <LI>Select drop down option using the HTML attribute value of "option 3":  <B>VALUE_HTML &gt;&gt;&gt; option 3</B></LI>
+ * <LI>Select drop down option at index 4 (provided there are at least 5 drop down options):  <B>INDEX &gt;&gt;&gt; 4</B></LI>
+ * <LI>Select drop down option using regular expression to match visible text of "option 5":   <B>VISIBLE_TEXT_REGEX &gt;&gt;&gt; .*5.*</B></LI>
+ * <LI>Select drop down option using regular expression to match the HTML attribute value of "option 6":  <B>VALUE_HTML_REGEX &gt;&gt;&gt; .*6.*</B></LI>
+ * <LI>Select a random option:  <B>RANDOM_INDEX &gt;&gt;&gt; 0</B></LI>
+ * <LI>Select a random option from index 1:  <B>RANDOM_INDEX &gt;&gt;&gt; 1</B></LI>
+ * <LI>Select a random option from the list of indexes {1, 3, 5}:  <B>RANDOM_INDEX_VALUES &gt;&gt;&gt; 1,3,5</B></LI>
+ * <LI>Select a random option from the list of consecutive indexes {1,2,3}:  <B>RANDOM_INDEX_RANGE &gt;&gt;&gt; 1:4</B></LI>
  * </OL>
  */
 public class SelectEnhanced extends PageComponent {
@@ -54,7 +54,7 @@ public class SelectEnhanced extends PageComponent {
     /**
      * Drop Down selection options
      */
-    private enum Selection {
+    protected enum Selection {
         VISIBLE_TEXT,
         VALUE_HTML,
         INDEX,
@@ -71,7 +71,7 @@ public class SelectEnhanced extends PageComponent {
          * @param defaultOption - Default Option if no match
          * @return Selection
          */
-        private static Selection to(String value, Selection defaultOption) {
+        public static Selection to(String value, Selection defaultOption) {
             if (value == null || value.equals("")) {
                 return defaultOption;
             }
@@ -88,13 +88,13 @@ public class SelectEnhanced extends PageComponent {
     }
 
     @XStreamOmitField
-    private Select select; // Drop down element
+    protected Select select; // Drop down element
 
     @XStreamOmitField
     private Selection selection; // How to select drop down value
 
     @XStreamOmitField
-    private String rawSelectionData; // If applicable, the value to selected as a String
+    protected String rawSelectionData; // If applicable, the value to selected as a String
 
     @XStreamOmitField
     private int minRandomIndex; // If applicable, minimum random index to use
@@ -118,7 +118,7 @@ public class SelectEnhanced extends PageComponent {
      *
      * @return Selection
      */
-    private Selection getSelection() {
+    protected Selection getSelection() {
         if (selection == null) {
             parseDataAndInitializeFields();
         }
@@ -126,6 +126,7 @@ public class SelectEnhanced extends PageComponent {
         return selection;
     }
 
+    @SuppressWarnings({"squid:S3776", "squid:S1871"})
     private void parseDataAndInitializeFields() {
         String[] pieces = StringUtils.split(getData(), SPLIT_ON, 2);
         if (pieces == null) {
@@ -178,7 +179,7 @@ public class SelectEnhanced extends PageComponent {
     }
 
     public SelectEnhanced() {
-        //
+        super();
     }
 
     public SelectEnhanced(WebElement element) {
@@ -191,6 +192,12 @@ public class SelectEnhanced extends PageComponent {
     }
 
     @Override
+    public void initializeData(String data, String initialData, String expectedData) {
+        selection = null;  // Trigger parsing and initialization
+        super.initializeData(data, initialData, expectedData);
+    }
+
+    @Override
     public void setValue() {
         Failsafe.with(Utils.getPollingRetryPolicy()).run(this::setValueAttempt);
     }
@@ -198,23 +205,28 @@ public class SelectEnhanced extends PageComponent {
     private void setValueAttempt() {
         if (getSelection() == Selection.VISIBLE_TEXT) {
             select.selectByVisibleText(rawSelectionData);
+            return;
         }
 
         if (getSelection() == Selection.VALUE_HTML) {
             select.selectByValue(rawSelectionData);
+            return;
         }
 
         if (getSelection() == Selection.INDEX) {
             selectedIndex = Integer.parseInt(rawSelectionData);
             select.selectByIndex(selectedIndex);
+            return;
         }
 
         if (getSelection() == Selection.VISIBLE_TEXT_REGEX) {
             setValueUsingTextRegEx();
+            return;
         }
 
         if (getSelection() == Selection.VALUE_HTML_REGEX) {
             setValueUsingHtmlRegEx();
+            return;
         }
 
         if (getSelection() == Selection.RANDOM_INDEX || getSelection() == Selection.RANDOM_INDEX_RANGE) {
@@ -223,6 +235,7 @@ public class SelectEnhanced extends PageComponent {
             selectedIndex = Rand.randomRange(minRandomIndex, max - 1);
             assertThat("Invalid Index", selectedIndex, range(0, all.size() - 1));
             select.selectByIndex(selectedIndex);
+            return;
         }
 
         if (getSelection() == Selection.RANDOM_INDEX_VALUES) {
@@ -233,7 +246,10 @@ public class SelectEnhanced extends PageComponent {
             List<WebElement> all = select.getOptions();
             assertThat("Invalid Index", selectedIndex, range(0, all.size() - 1));
             select.selectByIndex(selectedIndex);
+            return;
         }
+
+        assertThat("Unsupported Selection:  " + getSelection(), false);
     }
 
     private void setValueUsingTextRegEx() {
@@ -295,22 +311,36 @@ public class SelectEnhanced extends PageComponent {
         assertThat("Could not find visible text of a selected drop down option", actualVisibleText, notNullValue());
         assertThat("Could not find html value of a selected drop down option", actualHtmlValue, notNullValue());
 
+        // Assume that expected information is from DataTypes.Data
+        String expectedData = rawSelectionData;
+        int expectedIndex = selectedIndex;
+
+        if (validationMethod == DataTypes.Expected) {
+            expectedData = StringUtils.defaultString(validationMethod.getData(this), expectedData);
+            if (getSelection() == Selection.INDEX
+                    || getSelection() == Selection.RANDOM_INDEX
+                    || getSelection() == Selection.RANDOM_INDEX_RANGE
+                    || getSelection() == Selection.RANDOM_INDEX_VALUES) {
+                expectedIndex = NumberUtils.toInt(expectedData, expectedIndex);
+            }
+        }
+
         //
         // Verify the actual selected drop down option matches the one previously selected
         //
         if (getSelection() == Selection.VISIBLE_TEXT) {
-            assertThat("Visible Text of currently selected drop down option", actualVisibleText, equalTo(rawSelectionData));
+            assertThat("Visible Text of currently selected drop down option", actualVisibleText, equalTo(expectedData));
         } else if (getSelection() == Selection.VALUE_HTML) {
-            assertThat("HTML Value of currently selected drop down option", actualHtmlValue, equalTo(rawSelectionData));
+            assertThat("HTML Value of currently selected drop down option", actualHtmlValue, equalTo(expectedData));
         } else if (getSelection() == Selection.INDEX
                 || getSelection() == Selection.RANDOM_INDEX
                 || getSelection() == Selection.RANDOM_INDEX_RANGE
                 || getSelection() == Selection.RANDOM_INDEX_VALUES) {
-            assertThat("Index of currently selected drop down option", actualIndex, equalTo(selectedIndex));
+            assertThat("Index of currently selected drop down option", actualIndex, equalTo(expectedIndex));
         } else if (getSelection() == Selection.VISIBLE_TEXT_REGEX) {
-            assertThat("Visible Text of currently selected drop down option", actualVisibleText, matchesRegex(rawSelectionData));
+            assertThat("Visible Text of currently selected drop down option", actualVisibleText, matchesRegex(expectedData));
         } else if (getSelection() == Selection.VALUE_HTML_REGEX) {
-            assertThat("HTML Value of currently selected drop down option", actualHtmlValue, matchesRegex(rawSelectionData));
+            assertThat("HTML Value of currently selected drop down option", actualHtmlValue, matchesRegex(expectedData));
         } else {
             assertThat("Unsupported Selection:  " + getSelection(), false);
         }

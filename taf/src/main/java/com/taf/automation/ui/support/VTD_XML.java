@@ -1,16 +1,15 @@
 package com.taf.automation.ui.support;
 
+import com.ximpleware.AutoPilot;
+import com.ximpleware.VTDGen;
+import com.ximpleware.VTDNav;
+import org.apache.commons.io.IOUtils;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.commons.io.IOUtils;
-
-import com.ximpleware.AutoPilot;
-import com.ximpleware.VTDGen;
-import com.ximpleware.VTDNav;
 
 /**
  * This class uses VTD-XML for reading from an XML file. Use this class if having performance issues with the
@@ -70,7 +69,7 @@ public class VTD_XML {
      */
     public VTD_XML(InputStream in) throws Exception {
         byte[] b = IOUtils.toByteArray(in);
-        IOUtils.closeQuietly(in);
+        in.close();
         init(b);
     }
 
@@ -102,7 +101,7 @@ public class VTD_XML {
      * (This may be that eclipse was not running the 64-bit version of Java.)<BR>
      * <BR>
      * <B>Examples:</B><BR>
-     * 1) Given following XML and you want to parse values for var1 & var2<BR>
+     * 1) Given following XML and you want to parse values for var1 &amp; var2<BR>
      * &lt;rootNode&gt;<BR>
      * &nbsp;&nbsp;&lt;testcase&gt;<BR>
      * &nbsp;&nbsp;&nbsp;&nbsp;&lt;var1&gt;1&lt;/var1&gt;<BR>
@@ -127,16 +126,16 @@ public class VTD_XML {
     public void initializeForOptimizedParsing(String sRootXpath, String[] eachNodesXpath) {
         /*
          * Break the root xpath into pieces for navigation by toElement
-		 */
+         */
         if (sRootXpath.startsWith("/")) {
             toRootXpath = sRootXpath.substring(1).split("/");
         } else {
             toRootXpath = sRootXpath.split("/");
         }
 
-		/*
+        /*
          * Break each node xpath into pieces for navigation by toElement
-		 */
+         */
         int nNodes = eachNodesXpath.length;
         toEachNode = new String[nNodes][getMaxArraySize(eachNodesXpath)];
         for (int i = 0; i < nNodes; i++) {
@@ -158,7 +157,7 @@ public class VTD_XML {
     protected int getMaxArraySize(String[] nodes) {
         /*
          * Step 1: Get the lengths of each array
-		 */
+         */
         int nLength = nodes.length;
         int[] arraySizes = new int[nLength];
         for (int i = 0; i < nLength; i++) {
@@ -169,9 +168,9 @@ public class VTD_XML {
             }
         }
 
-		/*
-		 * Step 2: Find the largest array size from the previous step
-		 */
+        /*
+         * Step 2: Find the largest array size from the previous step
+         */
         int nLargestArray = arraySizes[0];
         for (int i = 1; i < nLength; i++) {
             if (arraySizes[i] > nLargestArray) {
@@ -362,8 +361,8 @@ public class VTD_XML {
     }
 
     /**
-     * Reads XML and puts the data into an array. Example, sRootXpath = "/root/testdata" & sEachNode =
-     * {"var1","var2"} => Get data for "/root/testdata[i]/var1" & "/root/testdata[i]/var2" where i is for each
+     * Reads XML and puts the data into an array. Example, sRootXpath = "/root/testdata" &amp; sEachNode =
+     * {"var1","var2"} =&gt; Get data for "/root/testdata[i]/var1" &amp; "/root/testdata[i]/var2" where i is for each
      * "/root/testdata" node found.
      *
      * @param sRootXpath - The root node that contains multiple sets of data
@@ -437,7 +436,7 @@ public class VTD_XML {
      * This method navigates to the next node and returns the data in an array using the method extractData()<BR>
      * <BR>
      * <B>Note: </B>If method cannot parse your XML file, then create a new class which inherits this class
-     * and override this method & the method extractData as necessary. (This may be the case if you need data
+     * and override this method &amp; the method extractData as necessary. (This may be the case if you need data
      * from attributes.)
      *
      * @return null if no more data else array of strings
@@ -499,7 +498,7 @@ public class VTD_XML {
      * This method reads the current node and returns it as an array<BR>
      * <BR>
      * <B>Note: </B>If method cannot parse your XML file, then create a new class which inherits this class
-     * and override this method & the method getNextNode as necessary. (This may be the case if you need data
+     * and override this method &amp; the method getNextNode as necessary. (This may be the case if you need data
      * from attributes.)
      *
      * @return String[]
@@ -644,7 +643,7 @@ public class VTD_XML {
      *
      * @param sXpath     - xpath to node
      * @param sAttribute - attribute to find
-     * @param sDefault   - value returned if xpath & attribute combination returns null
+     * @param sDefault   - value returned if xpath &amp; attribute combination returns null
      * @return String
      */
     public String getAttribute(String sXpath, String sAttribute, String sDefault) {

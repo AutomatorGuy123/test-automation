@@ -29,6 +29,16 @@ public class AllureTestNGListener extends AllureTestListener {
     }
 
     @Override
+    public void onTestSuccess(ITestResult iTestResult) {
+        super.onTestSuccess(iTestResult);
+        if (iTestResult.getMethod().getRetryAnalyzer() != null) {
+            // Workaround issue with retries in the TestNG logic added in 6.12
+            iTestResult.getTestContext().getSkippedTests().removeResult(iTestResult.getMethod());
+            iTestResult.getTestContext().getFailedTests().removeResult(iTestResult.getMethod());
+        }
+    }
+
+    @Override
     public void onTestFailure(ITestResult iTestResult) {
         Allure.LIFECYCLE.fire(new TestCaseFailureEvent().withThrowable(iTestResult.getThrowable()));
         TestNGBase.takeScreenshot("Failed Test Screenshot");
@@ -59,6 +69,19 @@ public class AllureTestNGListener extends AllureTestListener {
 
         fireTestCaseCancel(iTestResult);
         lifecycle.fire(new TestCaseFinishedEvent());
+    }
+
+    @Override
+    public void onConfigurationFailure(ITestResult iTestResult) {
+        TestNGBase.takeScreenshot("Configuration Failure Screenshot");
+        TestNGBase.takeHTML("Configuration Failure HTML Source");
+        super.onConfigurationFailure(iTestResult);
+    }
+
+    @Override
+    public void onConfigurationSkip(ITestResult iTestResult) {
+        // Configuration method will be shown in the report only on its failure in any other situation it is not listed
+        // Note:  If this is not the behavior desire and you want the default Allure behavior then remove this method.
     }
 
     private void fireTestCaseCancel(ITestResult iTestResult) {

@@ -1,5 +1,7 @@
 package com.taf.automation.ui.support;
 
+import com.taf.automation.ui.support.util.Utils;
+
 /**
  * The purpose of this class is to store various accents sets
  */
@@ -326,7 +328,7 @@ public class Accents {
     }
 
     /**
-     * Get the Czech, Slovak & Slovenian Accents string
+     * Get the Czech, Slovak &amp; Slovenian Accents string
      *
      * @return String
      */

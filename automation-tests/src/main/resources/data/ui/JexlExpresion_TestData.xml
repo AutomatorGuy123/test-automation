@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<jexl-expression-do>
+    <aliases>
+        <test-name>Validate that Jexl Expressions being evaluated properly</test-name>
+        <var1>${str1}</var1>
+        <var2>${str2}</var2>
+        <var3>${str1 + " " + str2}</var3>
+        <var4>${str2 + " " + str1}</var4>
+        <!-- Remove is only necessary if running the same test multiple times in the same thread -->
+        <var5>${lookup.remove("runtime001").append("runtime001", "12345").append("runtime001", "xyz").get("runtime001")}</var5>
+        <var6>12345xyz</var6>
+        <var7>${lookup.get("beforeLoadResource1") + lookup.get("beforeLoadResource2")}</var7>
+        <var8>${lookup.get("beforeLoadResource1")}</var8>
+        <var9>${lookup.get("beforeLoadResource2")}</var9>
+        <var10>${lookup.get("int100") + lookup.get("int200")}</var10>
+        <var11>300</var11>
+        <RandomDateGenerator>$[RANDOM_DATE('yyyy-MM-dd','365|720')]</RandomDateGenerator>
+        <RandomRealUSAddressGenerator>$[RANDOM_US_ADDRESS('{#} {C} {S} {Z} {U} {P}','')]</RandomRealUSAddressGenerator>
+        <orgPass>$[ALPHANUMERIC('{a}{b}{c}{d}{e}', 'null')]</orgPass>
+        <encPass>${crypto.encrypt(orgPass)}</encPass>
+        <decPass>${crypto.decrypt(encPass)}</decPass>
+
+        <random_date_pattern>MM/dd/yyyy</random_date_pattern>
+        <random_date_range_min>90</random_date_range_min>
+        <random_date_range_max>365</random_date_range_max>
+        <calcCurrentSystemDate>${lookup.getOrDefault("CURRENT_SYSTEM_DATE", today)}</calcCurrentSystemDate>
+        <currentSystemDate>${dateActions.parseDateStrictly(calcCurrentSystemDate, random_date_pattern)}</currentSystemDate>
+        <calcDate1>${dateActions.format(dateUtils.addDays(currentSystemDate, 1), random_date_pattern)}</calcDate1>
+        <calcDate2>${dateActions.format(dateUtils.addMonths(currentSystemDate, 1), random_date_pattern)}</calcDate2>
+        <calcDate3>${dateActions.format(dateUtils.addYears(currentSystemDate, 1), random_date_pattern)}</calcDate3>
+
+        <role>user</role>
+        <user>${env.getUser(role).getUserName()}</user>
+        <password>${crypto.decrypt(env.getUser(role).getPassword())}</password>
+
+        <role2>super</role2>
+        <user2>${env.getUser(role2).getUserName()}</user2>
+        <password2>${crypto.decrypt(env.getUser(role2).getPassword())}</password2>
+
+        <role3>admin</role3>
+        <user3>${env.getUser(role3).getUserName()}</user3>
+        <password3>${crypto.decrypt(env.getUser(role3).getPassword())}</password3>
+
+        <roundMode>${bdUtils.rounding("HALF_UP")}</roundMode>
+        <subTotal>599.99</subTotal>
+        <tax1percent>0.08</tax1percent>
+        <tax2percent>0.05</tax2percent>
+        <tax1>${bdUtils.multiply(subTotal,tax1percent).setScale(2,roundMode)}</tax1>
+        <tax2>${bdUtils.multiply(subTotal,tax2percent).setScale(2,roundMode)}</tax2>
+        <total>${bdUtils.create(subTotal).add(tax1.add(tax2))}</total>
+
+        <subBillTotal>3500</subBillTotal>
+        <numberOfPeople>3</numberOfPeople>
+        <discount>488.68</discount>
+        <billTotal>${bdUtils.divide(subBillTotal,numberOfPeople,"","").subtract(bdUtils.create(discount))}</billTotal>
+
+        <addition>${bdUtils.add(subTotal,discount).add(bdUtils.create("1800"))}</addition>
+        <subtraction>${bdUtils.subtract(subBillTotal,subTotal).subtract(bdUtils.create("11.34"))}</subtraction>
+    </aliases>
+    <someField initial="${var4} ${RandomDateGenerator} ${RandomRealUSAddressGenerator}" expected="${var1} ${var2}">${var3}</someField>
+    <anotherField initial="${encPass}" expected="${decPass}">${orgPass}</anotherField>
+    <extraField1 initial="${var5}" expected="${var6}">${var5}</extraField1>
+    <extraField2 initial="${var7}" expected="${var7}">${var8}${var9}</extraField2>
+    <extraField3 initial="${calcDate1} ${calcDate2}" expected="${calcDate3}">${calcDate3}</extraField3>
+    <extraField4 initial="${calcDate1} ${calcDate2}" expected="${var11}">${var10}</extraField4>
+    <currentSystemDate>${calcCurrentSystemDate}</currentSystemDate>
+
+    <userField1 initial="${role}" expected="u2 password2">${user} ${password}</userField1>
+    <userField2 initial="${role2}" expected="s2 password1">${user2} ${password2}</userField2>
+    <userField3 initial="${role3}" expected="a2 password">${user3} ${password3}</userField3>
+
+    <bdField1 expected="${billTotal}">${total}</bdField1>
+    <bdField2 expected="${subtraction}">${addition}</bdField2>
+</jexl-expression-do>

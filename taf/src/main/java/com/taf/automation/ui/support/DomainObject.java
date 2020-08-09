@@ -1,27 +1,24 @@
 package com.taf.automation.ui.support;
 
-import com.taf.automation.api.converters.BasicHeaderConverter;
-import com.taf.automation.api.converters.EnumConverter;
+import com.taf.automation.locking.UserLockManager;
+import com.taf.automation.ui.support.csv.CsvTestData;
+import com.taf.automation.ui.support.util.CryptoUtils;
+import com.taf.automation.ui.support.util.DataInstillerUtils;
+import com.taf.automation.ui.support.util.Helper;
 import com.thoughtworks.xstream.XStream;
-import com.thoughtworks.xstream.annotations.XStreamOmitField;
 import datainstiller.data.DataAliases;
-import datainstiller.data.DataGenerator;
 import datainstiller.data.DataPersistence;
-import datainstiller.data.DataValueConverter;
-import org.apache.http.message.BasicHeader;
-import org.testng.annotations.Test;
+import org.apache.commons.jexl3.JexlContext;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import ui.auto.core.context.PageComponentContext;
-import ui.auto.core.data.PageComponentDataConverter;
+import ui.auto.core.support.DomainObjectModel;
 
-import java.io.InputStream;
+import java.io.File;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 
-public class DomainObject extends DataPersistence {
-    @XStreamOmitField
-    private TestContext context;
+import static org.hamcrest.MatcherAssert.assertThat;
 
+public class DomainObject extends DomainObjectModel {
     public DomainObject(TestContext context) {
         this.context = context;
     }
@@ -30,35 +27,31 @@ public class DomainObject extends DataPersistence {
         //
     }
 
-    private List<DataValueConverter> setUpConverters() {
-        List<DataValueConverter> converters = new ArrayList<>();
+    @Override
+    protected void initJexlContext(JexlContext jexlContext) {
+        super.initJexlContext(jexlContext);
+        jexlContext.set("crypto", new CryptoUtils());
+        jexlContext.set("userLockManager", UserLockManager.getInstance());
+        jexlContext.set("lookup", Lookup.getInstance());
+    }
 
-        converters.add(new BasicHeaderConverter());
-
-        //
-        // Add application specific converters here
-        //
-
-        converters.add(new EnumConverter(EnvironmentType.class, Environment.QA));
-
-        return converters;
+    /**
+     * @return use reflection to get the Jexl Context from the class DataPersistence in which it is private
+     */
+    private JexlContext getJexlContext() {
+        try {
+            return (JexlContext) FieldUtils.readField(this, "jexlContext", true);
+        } catch (Exception ex) {
+            assertThat("Could not read jexlContext due to exception:  " + ex.getMessage(), false);
+            return null;
+        }
     }
 
     @Override
     public XStream getXstream() {
-        XStream xstream = super.getXstream();
-        for (DataValueConverter converter : setUpConverters()) {
-            xstream.alias("header", BasicHeader.class);
-            xstream.registerConverter(converter);
-        }
-
-        return xstream;
-    }
-
-    private DataGenerator getGenerator() {
-        List<DataValueConverter> converters = new ArrayList<>();
-        converters.add(new PageComponentDataConverter());
-        return new DataGenerator(converters);
+        XStream xStream = DataInstillerUtils.getXStream(getJexlContext());
+        xStream.processAnnotations(this.getClass());
+        return xStream;
     }
 
     private void addToGlobalAliases(DataPersistence data) {
@@ -99,76 +92,48 @@ public class DomainObject extends DataPersistence {
     }
 
     @Override
-    public <T extends DataPersistence> T fromXml(String xml, boolean resolveAliases) {
-        TestContext cont = getContext();
-        T data = super.fromXml(xml, resolveAliases);
-        addToGlobalAliases(data);
-        ((DomainObject) data).context = cont;
-        return data;
+    public <T extends DataPersistence> T fromResource(String resourceFilePath, boolean resolveAliases) {
+        return super.fromResource(Helper.getEnvironmentBasedFile(resourceFilePath), resolveAliases);
     }
 
-    @Override
-    public <T extends DataPersistence> T fromURL(URL url, boolean resolveAliases) {
-        TestContext cont = getContext();
-        T data = super.fromURL(url, resolveAliases);
-        addToGlobalAliases(data);
-        ((DomainObject) data).context = cont;
-        Utils.attachDataSet(data, url.getPath());
-        return data;
-    }
+    /**
+     * Loads a domain object from resources or file system without attaching the data file to the report<BR>
+     * <B>Note: </B> This method should only be used if you want to load the same data file multiple files
+     * but do not want the data file attached to the report multiple times.  Alternatively, you need to load
+     * a domain object to get lookup data for another data file and do not want this data file attached to the
+     * report because it would be duplicated.
+     *
+     * @param resourceFilePath - Resource File Path
+     * @param <T>              Domain Object
+     * @return T
+     */
+    public <T extends DataPersistence> T fromResourceSilent(String resourceFilePath) {
+        String useResourceFile = Helper.getEnvironmentBasedFile(resourceFilePath);
+        URL url = Thread.currentThread().getContextClassLoader().getResource(useResourceFile);
+        if (url != null) {
+            return fromURL(url, false);
+        }
 
-    @Override
-    public <T extends DataPersistence> T fromInputStream(InputStream inputStream, boolean resolveAliases) {
-        TestContext cont = getContext();
-        T data = super.fromInputStream(inputStream, resolveAliases);
-        addToGlobalAliases(data);
-        ((DomainObject) data).context = cont;
-        return data;
-    }
+        File file = new File(useResourceFile);
+        if (file.exists()) {
+            return fromFile(file.getAbsolutePath(), false);
+        }
 
-    @Override
-    public <T extends DataPersistence> T fromFile(String filePath, boolean resolveAliases) {
-        TestContext cont = getContext();
-        T data = super.fromFile(filePath, resolveAliases);
-        addToGlobalAliases(data);
-        ((DomainObject) data).context = cont;
-        Utils.attachDataSet(data, filePath);
-        return data;
-    }
-
-    @Override
-    public void generateData() {
-        DataPersistence obj = getGenerator().generate(this.getClass());
-        deepCopy(obj, this);
-    }
-
-    @Override
-    public String generateXML() {
-        DataPersistence obj = getGenerator().generate(this.getClass());
-        return obj.toXML();
-    }
-
-    @Override
-    public String toXML() {
-        String header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n";
-        XStream xstream = getXstream();
-        xstream.aliasSystemAttribute(null, "class");
-        String xml = xstream.toXML(this);
-        xml = xml.replaceAll(" xmlns.*\"schemaLocation\"", "");
-        return header + xml;
-    }
-
-    public TestContext getContext() {
-        return context;
+        assertThat("File '" + useResourceFile + "' was not found!", false);
+        return null;
     }
 
     public void setContext(TestContext context) {
         this.context = context;
     }
 
-    @Test
-    public void generate() {
-        System.out.println(generateXML());
+    /**
+     * Use the CSV data to set the variables in the domain object
+     *
+     * @param csvTestData - CSV test data
+     */
+    public void setData(CsvTestData csvTestData) {
+        // Method should be overridden in extending classes
     }
 
 }
